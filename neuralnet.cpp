@@ -80,6 +80,8 @@ public:
             exit(1);
         }
     }
+
+    return result;
 };
 
 int main()
