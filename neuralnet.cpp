@@ -59,7 +59,20 @@ public:
                 result[i] = sig[i] * (1 - sig[i]);
             }
         }
-        // TODO: implement the rest of the activation functions
+        if (strcmp(hidden_act_fun, "tanh") == 0)
+        {
+            for (int i = 0; i < size; i++)
+            {
+                result[i] = 1 - list[i] * list[i];
+            }
+        }
+        else if (strcmp(hidden_act_fun, "relu") == 0)
+        {
+            for (int i = 0; i < size; i++)
+            {
+                result[i] = list[i] >= 0 ? 1 : 0;
+            }
+        }
         else
         {
             std::cerr << "Error: Invalid hidden activation function\n";
