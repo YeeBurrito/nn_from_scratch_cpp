@@ -63,7 +63,8 @@ public:
         {
             for (int i = 0; i < size; i++)
             {
-                result[i] = 1 - list[i] * list[i];
+                vector<double> tanh = hidden_act(list);
+                result[i] = 1 - tanh[i] * tanh[i];
             }
         }
         else if (strcmp(hidden_act_fun, "relu") == 0)
