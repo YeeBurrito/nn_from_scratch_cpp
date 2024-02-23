@@ -5,7 +5,7 @@
 
 using std::vector;
 
-class neuralnet
+class neuralnetclass : public neuralnet
 {
 private:
     char *hidden_act_fun = "sig";
@@ -79,12 +79,41 @@ public:
             std::cerr << "Error: Invalid hidden activation function\n";
             exit(1);
         }
+
+        return result;
     }
 
-    return result;
+    vector<double> softmax(vector<double> list)
+    {
+        int size = list.size();
+        vector<double> result(size);
+        double sum = 0;
+
+        for (int i = 0; i < size; i++)
+        {
+            result[i] = exp(list[i]);
+            sum += result[i];
+        }
+
+        for (int i = 0; i < size; i++)
+        {
+            result[i] /= sum;
+        }
+
+        return result;
+    }
 };
 
 int main()
 {
-    return 0;
+    // test softmax
+    vector<double> list = {3.2, 1.3, 0.2, 0.8};
+
+    neuralnetclass nn;
+    vector<double> result = nn.softmax(list);
+
+    for (int i = 0; i < result.size(); i++)
+    {
+        std::cout << result[i] << " ";
+    }
 }
