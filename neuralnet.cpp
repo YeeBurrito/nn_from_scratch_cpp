@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <cstring>
+#include <algorithm>
 #include "neuralnet.h"
 
 using std::vector;
@@ -89,9 +90,13 @@ public:
         vector<double> result(size);
         double sum = 0;
 
+        // Find the maximum value in the list
+        double max_val = *max_element(list.begin(), list.end());
+
         for (int i = 0; i < size; i++)
         {
-            result[i] = exp(list[i]);
+            // Subtract the maximum value before exponentiating
+            result[i] = exp(list[i] - max_val);
             sum += result[i];
         }
 
@@ -107,7 +112,7 @@ public:
 int main()
 {
     // test softmax
-    vector<double> list = {3.2, 1.3, 0.2, 0.8};
+    vector<double> list = {3.2, 1.3, 0.2, 747.0};
 
     neuralnetclass nn;
     vector<double> result = nn.softmax(list);
