@@ -56,6 +56,7 @@ neuralnet::neuralnet(int input_size, int nlayers, int output_size, char *hidden_
             biases_layer[j] = (double)rand() / RAND_MAX * init_range * 2 - init_range;
         }
 
+        // TODO: Check if the weights and biases need to be transposed
         weights.push_back(weights_layer);
         biases.push_back(biases_layer);
     }
@@ -224,6 +225,113 @@ forward_pass_result neuralnet::forward(vector<double> inputs)
     forward_pass_result result;
     result.activations = activations;
     result.preactivations = preactivations;
+
+    return result;
+}
+
+void neuralnet::backward(vector<int> labels, forward_pass_result result, int num_classes)
+{
+    vector<vector<double>> preactivations = result.preactivations; // Get the preactivations
+    vector<vector<double>> activations = result.activations;       // Get the activations
+
+    vector<vector<double>> one_hot_labels;                      // Initialize one_hot_labels
+    vector<double> error = activations[activations.size() - 1]; // Initialize error
+
+    // If it is a classification problem, use the one-hot encoder
+    if (type == 'c')
+    {
+        one_hot_labels = one_hot_encoder(labels, num_classes);
+        // Calculate the error
+        for (int i = 0; i < error.size(); i++)
+        {
+            error[i] = activations[activations.size() - 1][i] - one_hot_labels[i][i];
+        }
+    }
+    else
+    {
+        // Calculate the error
+        for (int i = 0; i < error.size(); i++)
+        {
+            error[i] = activations[activations.size() - 1][i] - labels[i];
+        }
+    }
+
+    // Calculate the gradients for the output layer
+    vector<vector<vector<double>>> weights_deriv(nlayers + 1, vector<vector<double>>(nunits, vector<double>(nunits)));
+    vector<double> biases_deriv(nunits);
+
+    if (mb_size == 0)
+    {
+        mb_size = labels.size();
+    }
+
+    // Calculate the gradients for each layer and update them
+    for (int i = nlayers; i >= 0; i--)
+    {
+        // Calculate the weights derivative
+        // calculate the dot product of the error and the activations
+        weights_deriv[i] = vector<vector<double>>(weights[i].size(), vector<double>(weights[i][0].size()));
+        for (int j = 0; j < weights[i].size(); j++)
+        {
+            for (int k = 0; k < weights[i][j].size(); k++)
+            {
+                weights_deriv[i][j][k] = activations[i][j] * error[k];
+                // multiply by 1 / mb_size
+                weights_deriv[i][j][k] *= 1 / mb_size;
+            }
+        }
+        // Calculate the biases derivative
+        // This is the equivalent of biases_deriv[i] = (1/self.mb_size) * np.sum(error) in python
+        biases_deriv = vector<double>(biases[i].size());
+        for (int j = 0; j < biases[i].size(); j++)
+        {
+            biases_deriv[j] = error[j] * 1 / mb_size;
+        }
+
+        // Update the weights and biases
+        for (int j = 0; j < weights[i].size(); j++)
+        {
+            for (int k = 0; k < weights[i][j].size(); k++)
+            {
+                weights[i][j][k] -= learn_rate * weights_deriv[i][j][k];
+            }
+        }
+        for (int j = 0; j < biases[i].size(); j++)
+        {
+            biases[i][j] -= learn_rate * biases_deriv[j];
+        }
+
+        // Calculate the error for the next layer
+        if (i > 0)
+        {
+            vector<double> next_error = vector<double>(nunits);
+            for (int j = 0; j < nunits; j++)
+            {
+                next_error[j] = 0;
+                for (int k = 0; k < nunits; k++)
+                {
+                    next_error[j] += weights[i][k][j] * error[k];
+                }
+            }
+            error = next_error;
+        }
+    }
+}
+
+vector<vector<double>> one_hot_encoder(vector<int> labels, int num_classes)
+{
+    // Create arrays of zeros with length = num_classes
+
+    vector<vector<double>> result(labels.size(), vector<double>(num_classes, 0));
+
+    // make the index of the label 1, e.g. if label is 2, then the 2nd index of the array will be 1
+
+    for (int i = 0; i < labels.size(); i++)
+    {
+        result[i][labels[i]] = 1;
+    }
+
+    result = transpose_2d_vector(result);
 
     return result;
 }
