@@ -20,6 +20,9 @@ neuralnet::neuralnet(int input_size, int nlayers, int output_size, char *hidden_
     this->mb_size = mb_size;
     this->type = type;
 
+    weights = new double**[nlayers + 1];
+    biases = new double*[nlayers + 1];
+
     // Initialize weights and biases
     for (int i = 0; i < nlayers + 1; i++)
     {
@@ -42,30 +45,29 @@ neuralnet::neuralnet(int input_size, int nlayers, int output_size, char *hidden_
         {
             wb_output_size = nunits;
         }
-
-        vector<vector<double>> weights_layer(wb_input_size, vector<double>(wb_output_size));
-        vector<double> biases_layer(wb_output_size);
-
+        
+        weights[i] = new double*[wb_input_size];
+        biases[i] = new double[wb_output_size];
+  
         for (int j = 0; j < wb_input_size; j++)
         {
+            weights[i][j] = new double[wb_output_size];
+
             for (int k = 0; k < wb_output_size; k++)
             {
-                weights_layer[j][k] = (double)rand() / RAND_MAX * init_range * 2 - init_range;
+                weights[i][j][k] = (double)rand() / RAND_MAX * init_range * 2 - init_range;
             }
 
-            biases_layer[j] = (double)rand() / RAND_MAX * init_range * 2 - init_range;
+            biases[i][j] = (double)rand() / RAND_MAX * init_range * 2 - init_range;
         }
-
-        // TODO: Check if the weights and biases need to be transposed
-        weights.push_back(weights_layer);
-        biases.push_back(biases_layer);
     }
 }
 
-vector<double> neuralnet::hidden_act(vector<double> list)
+double* neuralnet::hidden_act(double* list)
 {
-    int size = list.size();
-    vector<double> result(size);
+    // Get the size of the list
+    int size = sizeof(list) / sizeof(list[0]);
+    double* result = new double[size];
 
     if (strcmp(hidden_act_fun, "sig") == 0)
     {
@@ -97,14 +99,14 @@ vector<double> neuralnet::hidden_act(vector<double> list)
     return result;
 }
 
-vector<double> neuralnet::deriv_hidden_act(vector<double> list)
+double* neuralnet::deriv_hidden_act(double* list)
 {
-    int size = list.size();
-    vector<double> result(size);
+    int size = sizeof(list) / sizeof(list[0]);
+    double* result = new double[size];
 
     if (strcmp(hidden_act_fun, "sig") == 0)
     {
-        vector<double> sig = hidden_act(list);
+        double* sig = hidden_act(list);
         for (int i = 0; i < size; i++)
         {
             result[i] = sig[i] * (1 - sig[i]);
@@ -114,7 +116,7 @@ vector<double> neuralnet::deriv_hidden_act(vector<double> list)
     {
         for (int i = 0; i < size; i++)
         {
-            vector<double> tanh = hidden_act(list);
+            double* tanh = hidden_act(list);
             result[i] = 1 - tanh[i] * tanh[i];
         }
     }
@@ -134,14 +136,13 @@ vector<double> neuralnet::deriv_hidden_act(vector<double> list)
     return result;
 }
 
-vector<double> neuralnet::softmax(vector<double> list)
+double* neuralnet::softmax(double* list, int size)
 {
-    int size = list.size();
-    vector<double> result(size);
+    double* result = new double[size];
     double sum = 0;
 
     // Find the maximum value in the list
-    double max_val = *max_element(list.begin(), list.end());
+    double max_val = *std::max_element(list, list + size);
 
     for (int i = 0; i < size; i++)
     {
@@ -158,69 +159,79 @@ vector<double> neuralnet::softmax(vector<double> list)
     return result;
 }
 
-forward_pass_result neuralnet::forward(vector<double> inputs)
+forward_pass_result neuralnet::forward(double* inputs)
 {
     // Store the preactivations and activations for each layer
-    vector<vector<double>> preactivations;
-    vector<vector<double>> activations;
-    vector<double> layer_input = inputs;
+    double** preactivations = new double*[nlayers + 1];
+    double** activations = new double*[nlayers + 1];
+
+    double* layer_input = new double[input_size];
+
+    for (int i = 0; i < input_size; i++)
+    {
+        layer_input[i] = inputs[i];
+    }
 
     // Calculate the preactivations and activations for all of the hidden layers
     for (int i = 0; i < nlayers; i++)
     {
-        vector<vector<double>> layer_weights = weights[i];
-        vector<double> layer_biases = biases[i];
-        vector<double> layer_preactivation(layer_weights.size());
+        double** layer_weights = weights[i];
+        double* layer_biases = biases[i];
 
-        for (int j = 0; j < layer_weights.size(); j++)
+        double* layer_preactivation = new double[nunits];
+
+        int layer_input_size = i == 0 ? input_size : nunits;
+
+        for (int j = 0; j < nunits; j++)
         {
             double preactivation = 0;
-            for (int k = 0; k < layer_weights[j].size(); k++)
+            for (int k = 0; k < layer_input_size; k++)
             {
-                preactivation += layer_weights[j][k] * layer_input[k];
+                preactivation += layer_weights[k][j] * layer_input[k];
             }
             preactivation += layer_biases[j];
             layer_preactivation[j] = preactivation;
         }
 
-        preactivations.push_back(layer_preactivation);
+        preactivations[i] = layer_preactivation;
 
-        vector<double> layer_activation = hidden_act(layer_preactivation);
-        activations.push_back(layer_activation);
+        double* layer_activation = hidden_act(layer_preactivation);
 
+        // Update the layer input
+        // This could be a different size than the input size
         layer_input = layer_activation;
     }
 
     // Calculate the preactivations and activations for the output layer
-    vector<vector<double>> output_weights = weights[nlayers];
-    vector<double> output_biases = biases[nlayers];
+    double** output_weights = weights[nlayers];
+    double* output_biases = biases[nlayers];
 
-    vector<double> output_preactivation(output_weights.size());
-    for (int i = 0; i < output_weights.size(); i++)
+    double* output_preactivation(new double[output_size]);
+    for (int i = 0; i < output_size; i++)
     {
         double preactivation = 0;
-        for (int j = 0; j < output_weights[i].size(); j++)
+        for (int j = 0; j < nunits; j++)
         {
-            preactivation += output_weights[i][j] * layer_input[j];
+            preactivation += output_weights[j][i] * layer_input[j];
         }
         preactivation += output_biases[i];
         output_preactivation[i] = preactivation;
     }
 
-    preactivations.push_back(output_preactivation);
+    preactivations[nlayers] = output_preactivation;
 
     // If the problem is classification, use the softmax function
-    vector<double> output_activation;
+    double* output_activation;
     if (type == 'c')
     {
-        output_activation = softmax(output_preactivation);
+        output_activation = softmax(output_preactivation, output_size);
     }
     else
     {
         output_activation = output_preactivation;
     }
 
-    activations.push_back(output_activation);
+    activations[nlayers] = output_activation;
 
     forward_pass_result result;
     result.activations = activations;
@@ -229,13 +240,13 @@ forward_pass_result neuralnet::forward(vector<double> inputs)
     return result;
 }
 
-void neuralnet::backward(vector<int> labels, forward_pass_result result, int num_classes)
+void neuralnet::backward(int* labels, forward_pass_result result, int num_classes)
 {
-    vector<vector<double>> preactivations = result.preactivations; // Get the preactivations
-    vector<vector<double>> activations = result.activations;       // Get the activations
+    double** preactivations = result.preactivations; // Get the preactivations
+    double** activations = result.activations;       // Get the activations
 
-    vector<vector<double>> one_hot_labels;                      // Initialize one_hot_labels
-    vector<double> error = activations[activations.size() - 1]; // Initialize error
+    double** one_hot_labels = new double*[num_classes]; // Initialize one_hot_labels
+    double* error = new double[num_classes];           // Initialize the error
 
     // If it is a classification problem, use the one-hot encoder
     if (type == 'c')
@@ -357,5 +368,5 @@ int main()
 {
     // test weight initialization
     // neuralnet(int input_size, int nlayers, int output_size, char *hidden_act_fun, double init_range, int nunits, double learn_rate, int mb_size, char type)
-    neuralnet *nn = new neuralnet(5, 2, 2, "sig", 0.5, 3, 0.1, 32, 'c');
+    neuralnet *nn = new neuralnet(5, 2, 2, (char*)"sig", 0.5, 3, 0.1, 32, 'c');
 }
