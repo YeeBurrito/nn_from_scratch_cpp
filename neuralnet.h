@@ -20,24 +20,24 @@ private:
     double learn_rate;                                     // Learning rate
     int mb_size;                                           // Mini-batch size
     char type;                        
-    
-    double*** weights;
-    double** biases;
 
     // Type of neural network, r for regression, c for classification
     //std::vector< std::vector< std::vector<double> > >* weights; // Weights for each layer
     //std::vector< std::vector<double> >* biases;               // Biases for each layer
 
 public:
+    double*** weights;
+    double** biases;
+
     // Class constructor
     neuralnet(int input_size, int nlayers, int output_size, char *hidden_act_fun, double init_range, int nunits, double learn_rate, int mb_size, char type);
 
-    double* hidden_act(double* list);
-    double* deriv_hidden_act(double* list);
+    double* hidden_act(double* list, int size);
+    double* deriv_hidden_act(double* list, int size);
     double* softmax(double* list, int size);
     forward_pass_result forward(double* inputs);
-    void backward(int* labels, forward_pass_result result, int num_classes);
+    void backward(double* labels, int num_labels, forward_pass_result result, int num_classes);
 };
 
-std::vector<std::vector<double>> one_hot_encoder(std::vector<int> labels, int num_classes);
-std::vector<std::vector<double>> transpose_2d_vector(std::vector<std::vector<double>> v);
+double** one_hot_encoder(double* labels, int num_labels, int num_classes);
+double** transpose_2d_vector(double** v, int n, int m);
