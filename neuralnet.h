@@ -36,8 +36,9 @@ public:
     double *deriv_hidden_act(double *list, int size);
     double *softmax(double *list, int size);
     forward_pass_result *forward(double **inputs, int num_inputs);
-    void backward(double *labels, forward_pass_result result, int num_classes);
+    void backward(double *labels, int num_labels, forward_pass_result *result, int num_classes);
 };
 
 double **one_hot_encoder(double *labels, int num_labels, int num_classes);
+double dot_product(double *list1, double *list2, int size);
 double **transpose_2d_vector(double **v, int n, int m);

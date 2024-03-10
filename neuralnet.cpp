@@ -23,6 +23,8 @@ neuralnet::neuralnet(int input_size, int nlayers, int output_size, char *hidden_
     this->weights = new double **[nlayers + 1];
     this->biases = new double *[nlayers + 1];
 
+    srand(time(NULL));
+
     // Initialize weights and biases
     for (int i = 0; i < nlayers + 1; i++)
     {
@@ -110,14 +112,16 @@ double *neuralnet::deriv_hidden_act(double *list, int size)
         {
             result[i] = sig[i] * (1 - sig[i]);
         }
+        delete[] sig;
     }
-    if (strcmp(hidden_act_fun, "tanh") == 0)
+    else if (strcmp(hidden_act_fun, "tanh") == 0)
     {
+        double *tanh = hidden_act(list, size);
         for (int i = 0; i < size; i++)
         {
-            double *tanh = hidden_act(list, size);
             result[i] = 1 - tanh[i] * tanh[i];
         }
+        delete[] tanh;
     }
     else if (strcmp(hidden_act_fun, "relu") == 0)
     {
@@ -242,75 +246,135 @@ forward_pass_result *neuralnet::forward(double **inputs, int num_inputs)
         // Store the results for the current input
         results[i] = result;
     }
+
+    return results;
 }
 
-void neuralnet::backward(double *labels, forward_pass_result result, int num_classes)
+// Backward pass
+// This function takes the labels and the results of the forward pass and calculates the gradients for each layer
+// and updates the weights and biases
+void neuralnet::backward(double *labels, int num_labels, forward_pass_result *result, int num_classes)
 {
-    double **preactivations = result.preactivations;
-    double **activations = result.activations;
-    int size = input_size;
-    double **one_hot_labels = new double *[size]; // Initialize the one-hot labels
-    double **error = new double *[size];          // Initialize the error
+    // First, find the error for the output layer on each of the labels
+    double **error = new double *[num_labels];
 
     // If it is a classification problem, use the one-hot encoder
     if (type == 'c')
     {
-        one_hot_labels = one_hot_encoder(labels, num_labels, num_classes);
-
-        // Calculate the error
-        for (int i = 0; i < size; i++)
+        double **one_hot_labels = one_hot_encoder(labels, num_labels, num_classes);
+        for (int i = 0; i < num_labels; i++)
         {
             error[i] = new double[num_classes];
             for (int j = 0; j < num_classes; j++)
             {
-                error[i][j] = activations[nlayers][j] - one_hot_labels[i][j];
+                error[i][j] = result[i].activations[nlayers][j] - one_hot_labels[i][j];
             }
         }
     }
     else
     {
-        // Calculate the error for a regression problem
-        for (int i = 0; i < size; i++)
+        for (int i = 0; i < num_labels; i++)
         {
-            error[i] = new double[1];
-            error[i][0] = activations[nlayers][0] - labels[i];
+            error[i] = new double[num_classes];
+            for (int j = 0; j < num_classes; j++)
+            {
+                error[i][j] = result[i].activations[nlayers][j] - labels[i];
+            }
         }
     }
 
     if (mb_size == 0)
     {
-        mb_size = size;
+        mb_size = num_labels;
     }
 
-    // Calculate the gradients for each layer and update them
-    for (int i = nlayers; i >= 0; i--)
+    // Calculate the gradients for each label
+    for (int i = 0; i < num_labels; i++)
     {
-        // Allocate memory for the weights and biases gradients
-        double **weights_deriv = new double *[i == 0 ? input_size : nunits];
-        double *biases_deriv = new double[i == nlayers ? output_size : nunits];
+        // Calculate the gradients for each layer and update the weights and biases
+        for (int layer_index = nlayers; layer_index >= 0; layer_index--)
+        {
+            // Get the activations for the current layer
+            double *current_activations = result[i].activations[layer_index];
+            double *current_preactivations = result[i].preactivations[layer_index];
 
-        // Weights_deriv = (1 / mb_size) * np.dot(error, activations[i].T)
-        // Print the activations and error
-        std::cout << "Activations: \n";
-        for (int i = 0; i < size; i++)
-        {
-            for (int j = 0; j < num_classes; j++)
+            // Calculate the gradients for the output layer
+            if (layer_index == nlayers)
             {
-                std::cout << activations[nlayers][j] << " ";
+                double weights_gradient = dot_product(current_activations, error[i], num_classes);
+                double biases_gradient = std::accumulate(error[i], error[i] + num_classes, 0.0);
+
+                weights_gradient /= mb_size;
+                biases_gradient /= mb_size;
+
+                // Update the weights and biases for the output layer
+                for (int j = 0; j < nunits; j++)
+                {
+                    for (int k = 0; k < num_classes; k++)
+                    {
+                        weights[nlayers][j][k] -= learn_rate * weights_gradient;
+                    }
+                    biases[nlayers][j] -= learn_rate * biases_gradient;
+                }
+
+                // Calculate the error for the next layer
+                double *next_error = new double[nunits];
+                double dot = dot_product(weights[nlayers][0], error[i], num_classes);
+                double *deriv = deriv_hidden_act(current_preactivations, nunits);
+                for (int j = 0; j < nunits; j++)
+                {
+                    next_error[j] = dot * deriv[j];
+                }
+
+                // Update the error for the next layer
+                delete[] error[i];
+                error[i] = next_error;
             }
-            std::cout << std::endl;
-        }
-        std::cout << "Error: \n";
-        for (int i = 0; i < size; i++)
-        {
-            for (int j = 0; j < num_classes; j++)
+
+            // Calculate the gradients for the hidden layers
+            else
             {
-                std::cout << error[i][j] << " ";
+                double **next_weights = weights[layer_index + 1];
+                double *next_error = error[i];
+                double *deriv = deriv_hidden_act(current_preactivations, nunits);
+
+                // Calculate the gradients for the weights and biases
+                for (int j = 0; j < nunits; j++)
+                {
+                    for (int k = 0; k < num_classes; k++)
+                    {
+                        double weights_gradient = current_activations[j] * next_error[k];
+                        weights_gradient /= mb_size;
+                        weights[layer_index][j][k] -= learn_rate * weights_gradient;
+                    }
+                    double biases_gradient = next_error[j];
+                    biases_gradient /= mb_size;
+                    biases[layer_index][j] -= learn_rate * biases_gradient;
+                }
+
+                // Calculate the error for the next layer
+                if (layer_index > 0)
+                {
+                    double *next_error = new double[nunits];
+                    for (int j = 0; j < nunits; j++)
+                    {
+                        next_error[j] = dot_product(next_weights[j], next_error, num_classes) * deriv[j];
+                    }
+
+                    // Update the error for the next layer
+                    delete[] error[i];
+                    error[i] = next_error;
+                }
             }
-            std::cout << std::endl;
         }
-        exit(1);
     }
+
+    // Cleanup
+    for (int i = 0; i < num_labels; i++)
+    {
+        delete[] error[i];
+    }
+    delete[] error;
 }
 
 // One-hot encoder
@@ -343,6 +407,22 @@ double **one_hot_encoder(double *labels, int num_labels, int num_classes)
     return result;
 }
 
+// Dot product
+// This function takes two lists and returns the dot product of the two lists
+// Example usage: dot_product([1, 2, 3], [4, 5, 6])
+// Output: 32
+double dot_product(double *list1, double *list2, int size)
+{
+    double result = 0;
+
+    for (int i = 0; i < size; i++)
+    {
+        result += list1[i] * list2[i];
+    }
+
+    return result;
+}
+
 double **transpose_2d_vector(double **v, int n, int m)
 {
     double **result = new double *[m];
@@ -361,38 +441,6 @@ double **transpose_2d_vector(double **v, int n, int m)
 
 int main()
 {
-    printf("Hello, World!\n");
-    // test weight initialization
     // neuralnet(int input_size, int nlayers, int output_size, char *hidden_act_fun, double init_range, int nunits, double learn_rate, int mb_size, char type)
-    neuralnet *nn = new neuralnet(5, 2, 1, (char *)"sig", 0.5, 3, 0.1, 0, 'r');
-    // test forward pass
-    double inputs[5] = {1, 2, 3, 4, 5};
-    forward_pass_result result = nn->forward(inputs);
-    // print the result
-    std::cout << "Activations: \n";
-    std::cout << result.activations[2][0] << std::endl;
-    double labels[1] = {0.3};
-    // print weights before
-    std::cout << "Weights before: \n";
-    for (int i = 0; i < 5; i++)
-    {
-        for (int j = 0; j < 3; j++)
-        {
-            std::cout << nn->weights[0][i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
-    // test backward pass
-    nn->backward(labels, 1, result, 1);
-    // print weights after
-    std::cout << "Weights after: \n";
-    for (int i = 0; i < 5; i++)
-    {
-        for (int j = 0; j < 3; j++)
-        {
-            std::cout << nn->weights[0][i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
-    return 0;
+    neuralnet *nn = new neuralnet(5, 2, 1, (char *)"sig", 1.0, 2, 0.1, 0, 'r');
 }
