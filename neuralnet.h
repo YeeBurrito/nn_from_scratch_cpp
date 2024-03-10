@@ -31,7 +31,8 @@ public:
     std::vector<double> deriv_hidden_act(std::vector<double> list);
     std::vector<double> softmax(std::vector<double> list);
     forward_pass_result forward(std::vector<double> inputs);
-    void backward(vector<int> labels, forward_pass_result result, int num_classes);
+    void backward(std::vector<double> labels, forward_pass_result result, int num_classes);
 };
 
 std::vector<std::vector<double>> transpose_2d_vector(std::vector<std::vector<double>> v);
+std::vector<std::vector<double>> one_hot_encoder(std::vector<double> labels, int num_classes);

@@ -1,0 +1,5 @@
+Weights shape: [layer_input_size, layer_output_size}
+e.g. if the input is 3 and the next layer has 2 nodes, the size of weights
+for that layer will be 3,2
+
+weights[layer][output][input]

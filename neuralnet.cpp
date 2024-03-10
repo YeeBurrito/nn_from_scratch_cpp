@@ -56,12 +56,17 @@ neuralnet::neuralnet(int input_size, int nlayers, int output_size, char *hidden_
             biases_layer[j] = (double)rand() / RAND_MAX * init_range * 2 - init_range;
         }
 
-        // TODO: Check if the weights and biases need to be transposed
+        // Transpose the weights
+        weights_layer = transpose_2d_vector(weights_layer);
+
         weights.push_back(weights_layer);
         biases.push_back(biases_layer);
     }
 }
 
+// Hidden layer activation function
+// Input: list of preactivations Format: list of doubles
+// Output: list of activations Format: list of doubles
 vector<double> neuralnet::hidden_act(vector<double> list)
 {
     int size = list.size();
@@ -97,6 +102,9 @@ vector<double> neuralnet::hidden_act(vector<double> list)
     return result;
 }
 
+// Derivative of the hidden layer activation function
+// Input: list of activations Format: list of doubles
+// Output: list of derivatives Format: list of doubles
 vector<double> neuralnet::deriv_hidden_act(vector<double> list)
 {
     int size = list.size();
@@ -134,6 +142,9 @@ vector<double> neuralnet::deriv_hidden_act(vector<double> list)
     return result;
 }
 
+// Softmax function
+// Input: list of preactivations Format: list of doubles
+// Output: list of activations Format: list of doubles
 vector<double> neuralnet::softmax(vector<double> list)
 {
     int size = list.size();
@@ -158,6 +169,9 @@ vector<double> neuralnet::softmax(vector<double> list)
     return result;
 }
 
+// Forward pass
+// Input: inputs Format: list of doubles
+// Output: forward_pass_result Format: struct
 forward_pass_result neuralnet::forward(vector<double> inputs)
 {
     // Store the preactivations and activations for each layer
@@ -177,6 +191,7 @@ forward_pass_result neuralnet::forward(vector<double> inputs)
             double preactivation = 0;
             for (int k = 0; k < layer_weights[j].size(); k++)
             {
+                printf("layer_weights[j][k]: %f\n", layer_weights[j][k]);
                 preactivation += layer_weights[j][k] * layer_input[k];
             }
             preactivation += layer_biases[j];
@@ -229,7 +244,7 @@ forward_pass_result neuralnet::forward(vector<double> inputs)
     return result;
 }
 
-void neuralnet::backward(vector<int> labels, forward_pass_result result, int num_classes)
+void neuralnet::backward(vector<double> labels, forward_pass_result result, int num_classes)
 {
     vector<vector<double>> preactivations = result.preactivations; // Get the preactivations
     vector<vector<double>> activations = result.activations;       // Get the activations
@@ -318,7 +333,7 @@ void neuralnet::backward(vector<int> labels, forward_pass_result result, int num
     }
 }
 
-vector<vector<double>> one_hot_encoder(vector<int> labels, int num_classes)
+vector<vector<double>> one_hot_encoder(vector<double> labels, int num_classes)
 {
     // Create arrays of zeros with length = num_classes
 
@@ -328,10 +343,10 @@ vector<vector<double>> one_hot_encoder(vector<int> labels, int num_classes)
 
     for (int i = 0; i < labels.size(); i++)
     {
-        result[i][labels[i]] = 1;
+        result[i][(int)labels[i]] = 1;
     }
 
-    result = transpose_2d_vector(result);
+    // result = transpose_2d_vector(result);
 
     return result;
 }
@@ -355,7 +370,12 @@ vector<vector<double>> transpose_2d_vector(vector<vector<double>> v)
 
 int main()
 {
+    printf("Hello, World!\n");
     // test weight initialization
     // neuralnet(int input_size, int nlayers, int output_size, char *hidden_act_fun, double init_range, int nunits, double learn_rate, int mb_size, char type)
-    neuralnet *nn = new neuralnet(5, 2, 2, "sig", 0.5, 3, 0.1, 32, 'c');
+    neuralnet *nn = new neuralnet(3, 1, 1, "sig", 0.5, 2, 0.1, 32, 'c');
+
+    // test forward pass
+    vector<double> inputs = {1, 2, 3};
+    forward_pass_result result = nn->forward(inputs);
 }
