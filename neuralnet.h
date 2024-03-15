@@ -36,3 +36,4 @@ public:
 
 std::vector<std::vector<double>> transpose_2d_vector(std::vector<std::vector<double>> v);
 std::vector<std::vector<double>> one_hot_encoder(std::vector<double> labels, int num_classes);
+double dot_product(std::vector<double> a, std::vector<double> b);
