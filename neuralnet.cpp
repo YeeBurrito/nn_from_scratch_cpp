@@ -20,58 +20,52 @@ neuralnet::neuralnet(int input_size, int nlayers, int output_size, char *hidden_
     this->mb_size = mb_size;
     this->type = type;
 
-    // // Use the srand function to generate random numbers
-    // srand(time(NULL));
+    // Use the srand function to generate random numbers
+    srand(time(NULL));
 
-    // // Initialize weights and biases
-    // for (int i = 0; i < nlayers + 1; i++)
-    // {
-    //     int wb_input_size = 0;
-    //     int wb_output_size = 0;
-    //     // Get the correct input and output size for the first and last layers
-    //     if (i == 0)
-    //     {
-    //         wb_input_size = input_size;
-    //     }
-    //     else
-    //     {
-    //         wb_input_size = nunits;
-    //     }
-    //     if (i == nlayers)
-    //     {
-    //         wb_output_size = output_size;
-    //     }
-    //     else
-    //     {
-    //         wb_output_size = nunits;
-    //     }
+    // Initialize weights and biases
+    for (int i = 0; i < nlayers + 1; i++)
+    {
+        int wb_input_size = 0;
+        int wb_output_size = 0;
+        // Get the correct input and output size for the first and last layers
+        if (i == 0)
+        {
+            wb_input_size = input_size;
+        }
+        else
+        {
+            wb_input_size = nunits;
+        }
+        if (i == nlayers)
+        {
+            wb_output_size = output_size;
+        }
+        else
+        {
+            wb_output_size = nunits;
+        }
 
-    //     vector<vector<double>> weights_layer(wb_input_size, vector<double>(wb_output_size));
-    //     vector<double> biases_layer(wb_output_size);
+        vector<vector<double>> weights_layer(wb_input_size, vector<double>(wb_output_size));
+        vector<double> biases_layer(wb_output_size);
 
-    //     for (int j = 0; j < wb_input_size; j++)
-    //     {
-    //         for (int k = 0; k < wb_output_size; k++)
-    //         {
-    //             weights_layer[j][k] = (double)rand() / RAND_MAX * init_range * 2 - init_range;
-    //         }
-    //     }
+        for (int j = 0; j < wb_input_size; j++)
+        {
+            for (int k = 0; k < wb_output_size; k++)
+            {
+                weights_layer[j][k] = (double)rand() / RAND_MAX * init_range * 2 - init_range;
+            }
+        }
 
-    //     for (int j = 0; j < wb_output_size; j++)
-    //     {
-    //         biases_layer[j] = (double)rand() / RAND_MAX * init_range * 2 - init_range;
-    //     }
+        for (int j = 0; j < wb_output_size; j++)
+        {
+            biases_layer[j] = (double)rand() / RAND_MAX * init_range * 2 - init_range;
+        }
 
-    //     weights_layer = transpose_2d_vector(weights_layer);
-    //     weights.push_back(weights_layer);
-    //     biases.push_back(biases_layer);
-    // }
-
-    // Initialize the weights and biases to a set value
-    weights.push_back({{0.15, 0.20}, {0.25, 0.30}});
-    weights.push_back({{0.40, 0.45}, {0.50, 0.55}});
-    biases.push_back({0.35, 0.35});
-    biases.push_back({0.60, 0.60});
+        weights_layer = transpose_2d_vector(weights_layer);
+        weights.push_back(weights_layer);
+        biases.push_back(biases_layer);
+    }
 }
 
 // Hidden layer activation function
@@ -267,13 +261,21 @@ forward_pass_result neuralnet::forward(vector<double> inputs)
     return result;
 }
 
-void neuralnet::backward(vector<double> labels, forward_pass_result result, int num_classes)
+void neuralnet::backward(vector<double> inputs, vector<double> labels, forward_pass_result result, int num_classes)
 {
     vector<vector<double>> preactivations = result.preactivations; // Get the preactivations
     vector<vector<double>> activations = result.activations;       // Get the activations
 
     vector<vector<double>> one_hot_labels;                      // Initialize one_hot_labels
     vector<double> error = activations[activations.size() - 1]; // Initialize error
+
+    // Print the inputs and results
+    printf("inputs: %f, %f\n", inputs[0], inputs[1]);
+    // Only print the last layer
+    for (int i = 0; i < activations[activations.size() - 1].size(); i++)
+    {
+        printf("activations[%d]: %f\n", i, activations[activations.size() - 1][i]);
+    }
 
     // If it is a classification problem, use the one-hot encoder
     if (type == 'c')
@@ -292,6 +294,12 @@ void neuralnet::backward(vector<double> labels, forward_pass_result result, int 
         {
             error[i] = activations[activations.size() - 1][i] - labels[i];
         }
+    }
+
+    // Print the error
+    for (int i = 0; i < error.size(); i++)
+    {
+        printf("error[%d]: %f\n", i, error[i]);
     }
 
     if (mb_size == 0)
@@ -356,6 +364,43 @@ void neuralnet::backward(vector<double> labels, forward_pass_result result, int 
             error = next_error;
         }
     }
+
+    // Run the forward pass again to see the new activations, and print the new error
+    forward_pass_result new_result = forward(inputs);
+
+    // Print the new activations
+    // Only print the last layer
+    for (int i = 0; i < new_result.activations[new_result.activations.size() - 1].size(); i++)
+    {
+        printf("new_activations[%d]: %f\n", i, new_result.activations[new_result.activations.size() - 1][i]);
+    }
+
+    // Calculate the new error
+    vector<double> new_error = activations[activations.size() - 1]; // Initialize new error
+
+    // If it is a classification problem, use the one-hot encoder
+    if (type == 'c')
+    {
+        // Calculate the new error
+        for (int i = 0; i < new_error.size(); i++)
+        {
+            new_error[i] = activations[activations.size() - 1][i] - one_hot_labels[i][i];
+        }
+    }
+    else
+    {
+        // Calculate the new error
+        for (int i = 0; i < new_error.size(); i++)
+        {
+            new_error[i] = activations[activations.size() - 1][i] - labels[i];
+        }
+    }
+
+    // Print the new error
+    for (int i = 0; i < new_error.size(); i++)
+    {
+        printf("new_error[%d]: %f\n", i, new_error[i]);
+    }
 }
 
 vector<vector<double>> one_hot_encoder(vector<double> labels, int num_classes)
@@ -405,7 +450,7 @@ double dot_product(vector<double> a, vector<double> b)
 
 int main()
 {
-    printf("Hello, World!\n");
+    printf("BREAK OLD OUTPUTS!\n");
     // test weight initialization
     // neuralnet(int input_size, int nlayers, int output_size, char *hidden_act_fun, double init_range, int nunits, double learn_rate, int mb_size, char type)
     neuralnet *nn = new neuralnet(2, 1, 2, "sig", 0.5, 2, 0.1, 0, 'r');
@@ -436,7 +481,7 @@ int main()
     //     printf("Input: %f, %f, %f, Output: %f\n", inputs[i][0], inputs[i][1], inputs[i][2], output[0]);
     // }
 
-    vector<vector<double>> inputs = {{0.05, 0.1}};
+    vector<vector<double>> inputs = {{1.0, 0.0}};
 
     forward_pass_result result = nn->forward(inputs[0]);
     // print the activations
@@ -448,15 +493,18 @@ int main()
         }
     }
 
-    for (int i = 0; i < 1000; i++)
+    for (int i = 0; i < 100; i++)
     {
         for (int j = 0; j < inputs.size(); j++)
         {
+            inputs[j][1] = (double)rand() / RAND_MAX;
             forward_pass_result result = nn->forward(inputs[j]);
-            nn->backward({0.01, 0.99}, result, 1);
+            vector<double> labels = {0.77, inputs[j][1]};
+            nn->backward(inputs[j], labels, result, 1);
         }
     }
 
+    inputs = {{1.0, 0.0}};
     result = nn->forward(inputs[0]);
 
     for (int i = 0; i < result.activations.size(); i++)
